@@ -47,6 +47,8 @@ struct PlayMode : Mode {
   virtual void update(float elapsed) override;
   virtual void draw(glm::uvec2 const &drawable_size) override;
 
+  //helper functions
+  void load_level(size_t id);
   //----- game state -----
 
   // level index
@@ -58,9 +60,19 @@ struct PlayMode : Mode {
     uint8_t pressed = 0;
   } left, right, down, up;
 
-  //player position:
-  glm::vec2 player_location = glm::vec2(0.0f);
-  glm::vec2 player_velocity = glm::vec2(0.0f);
+  //object status:
+  enum class ObjectType {
+    player,
+    shell
+  };
+
+  struct Object {
+    glm::vec2 pos{};
+    glm::vec2 v{};
+    ObjectType type{};
+  };
+
+  std::array<Object, 64> objects{};
 
   //----- drawing handled by PPU466 -----
 

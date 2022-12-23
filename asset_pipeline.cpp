@@ -1,13 +1,12 @@
 #include "asset_pipeline.h"
 
 namespace {
-constexpr std::array<glm::u8vec4, 5> pixel_pattern = {
-    glm::u8vec4(0x00, 0x00, 0x00, 0xff), // empty
-    glm::u8vec4(0xa5, 0x2a, 0x2a, 0xff), // wall
-    glm::u8vec4(0x80, 0x80, 0x80, 0xff), // spike
-    glm::u8vec4(0xff, 0x00, 0x00, 0xff), // spawn_point
-    glm::u8vec4(0x00, 0x00, 0xff, 0xff) // target_point
-};
+constexpr auto empty_pattern = glm::u8vec4(0x87, 0xce, 0xeb, 0xff);
+constexpr auto wall_pattern = glm::u8vec4(0xa5, 0x2a, 0x2a, 0xff);
+constexpr auto spike_pattern = glm::u8vec4(0x80, 0x80, 0x80, 0xff);
+constexpr auto artillery_pattern = glm::u8vec4(0x4b, 0x53, 0x20, 0xff);
+constexpr auto spawn_point_pattern = glm::u8vec4(0x00, 0xff, 0x00, 0xff);
+constexpr auto target_point_pattern = glm::u8vec4(0x00, 0x00, 0xff, 0xff);
 }
 
 bool process_assets() {
@@ -27,14 +26,21 @@ bool process_assets() {
   }
   std::vector<uint8_t> level_chunk;
   for (const auto &pixel : pixels) {
-    for (uint8_t i = 0; i <= uint8_t(Level::TileType::enum_count); ++i) {
-      if (pixel == pixel_pattern[i]) {
-        level_chunk.push_back(i);
-        break;
-      } else if (i == uint8_t(Level::TileType::enum_count)) {
-        std::cerr << "Invalid pixel pattern.\n";
-        return false;
-      }
+    if (pixel == empty_pattern) {
+      level_chunk.push_back(std::uint8_t(Level::TileType::empty));
+    } else if (pixel == wall_pattern) {
+      level_chunk.push_back(std::uint8_t(Level::TileType::wall));
+    } else if (pixel == spike_pattern) {
+      level_chunk.push_back(std::uint8_t(Level::TileType::spike));
+    } else if (pixel == artillery_pattern) {
+      level_chunk.push_back(std::uint8_t(Level::TileType::artillery));
+    } else if (pixel == spawn_point_pattern) {
+      level_chunk.push_back(std::uint8_t(Level::TileType::spawn_point));
+    } else if (pixel == target_point_pattern) {
+      level_chunk.push_back(std::uint8_t(Level::TileType::target_point));
+    } else {
+      std::cerr << "Invalid pattern.\n";
+      return false;
     }
   }
   write_chunk<uint8_t>("leve", level_chunk, &ofs);
