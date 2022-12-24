@@ -49,7 +49,7 @@ std::vector<uint8_t> bit1;
        read_chunk<uint8_t>(ifs, "pale", &data);
        std::array<glm::u8vec4, 4> palette{};
        auto palette_itr = palette.begin();
-       for (int i = 0; i < data.size(); i += 4) {
+       for (size_t i = 0; i < data.size(); i += 4) {
          (*palette_itr) = {data[i], data[i + 1], data[i + 2], data[i + 3]};
          if (++palette_itr == palette.end()) {
            palettes.emplace_back(palette);
@@ -58,7 +58,7 @@ std::vector<uint8_t> bit1;
        }
 
        read_chunk<uint8_t>(ifs, "tile", &data);
-       for (int i = 0; i < data.size(); i += 2) {
+       for (size_t i = 0; i < data.size(); i += 2) {
          bit0.emplace_back(data[i]);
          bit1.emplace_back(data[i + 1]);
        }

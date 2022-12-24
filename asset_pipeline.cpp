@@ -101,7 +101,7 @@ bool process_assets() {
         palette_chunk.emplace_back(palette[i][j]);
       }
     }
-    for (int i = 0; i < sprite_height; ++i) {
+    for (glm::uint i = 0; i < sprite_height; ++i) {
       tile_chunk.emplace_back(bit0[i]);
       tile_chunk.emplace_back(bit1[i]);
     }
