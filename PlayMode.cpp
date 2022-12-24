@@ -13,19 +13,29 @@ namespace {
 constexpr auto empty_tile = 0;
 constexpr auto wall_tile = 1;
 constexpr auto spike_tile = 2;
-constexpr auto cannon_active_tile = 3;
-constexpr auto cannon_inactive_tile = 3;
+constexpr auto cannon_tile = 3;
 constexpr auto target_point_tile = 4;
-constexpr auto player_tile = 5;
-constexpr auto shell_tile = 6;
-constexpr auto bullet_tile = 7;
+constexpr auto player_left_tile = 5;
+constexpr auto player_right_tile = 6;
+constexpr auto shell_tile = 7;
+constexpr auto bullet_tile = 8;
 
 constexpr auto wall_palette = 0;
 constexpr auto spike_palette = 1;
-constexpr auto cannon_palette = 2;
-constexpr auto target_point_palette = 3;
-constexpr auto player_palette = 4;
-constexpr auto shell_bullet_palette = 5;
+constexpr auto cannon_active_palette = 2;
+constexpr auto cannon_inactive_palette = 3;
+constexpr auto target_point_palette = 4;
+constexpr auto player_palette = 5;
+constexpr auto shell_bullet_palette = 6;
+}
+
+namespace {
+uint8_t reverse_bits(uint8_t n) {
+  n = (n >> 4) | (n << 4);
+  n = ((n & 0b11001100) >> 2) | ((n & 0b00110011) << 2);
+  n = ((n & 0b10101010) >> 1) | ((n & 0b01010101) << 1);
+  return n;
+}
 }
 
 PlayMode::PlayMode() {
@@ -34,74 +44,33 @@ PlayMode::PlayMode() {
   ppu.tile_table[empty_tile].bit0 = {};
   ppu.tile_table[empty_tile].bit1 = {};
 
-  ppu.tile_table[wall_tile].bit0 = {
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-  };
-  ppu.tile_table[wall_tile].bit1 = {};
+  for (int i = 0; i < 8; ++i) {
+    ppu.tile_table[player_right_tile].bit0[i] = bit0[i];
+    ppu.tile_table[player_right_tile].bit1[i] = bit1[i];
 
-  ppu.tile_table[spike_tile].bit0 = {
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-  };
-  ppu.tile_table[spike_tile].bit1 = {};
+    ppu.tile_table[player_left_tile].bit0[i] = reverse_bits(bit0[i]);
+    ppu.tile_table[player_left_tile].bit1[i] = reverse_bits(bit1[i]);
+  }
 
-  ppu.tile_table[cannon_active_tile].bit0 = {
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-  };
-  ppu.tile_table[cannon_active_tile].bit1 = {};
+  for (int i = 0; i < 8; ++i) {
+    ppu.tile_table[wall_tile].bit0[i] = bit0[i + 8];
+    ppu.tile_table[wall_tile].bit1[i] = bit1[i + 8];
+  }
 
-  ppu.tile_table[target_point_tile].bit0 = {
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-  };
-  ppu.tile_table[target_point_tile].bit1 = {};
+  for (int i = 0; i < 8; ++i) {
+    ppu.tile_table[spike_tile].bit0[i] = bit0[i + 16];
+    ppu.tile_table[spike_tile].bit1[i] = bit1[i + 16];
+  }
 
-  ppu.tile_table[player_tile].bit0 = {
-      0b01111110,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b11111111,
-      0b01111110,
-  };
-  ppu.tile_table[player_tile].bit1 = {
-      0b00000000,
-      0b00000000,
-      0b00011000,
-      0b00100100,
-      0b00000000,
-      0b00100100,
-      0b00000000,
-      0b00000000,
-  };
+  for (int i = 0; i < 8; ++i) {
+    ppu.tile_table[cannon_tile].bit0[i] = bit0[i + 24];
+    ppu.tile_table[cannon_tile].bit1[i] = bit1[i + 24];
+  }
+
+  for (int i = 0; i < 8; ++i) {
+    ppu.tile_table[target_point_tile].bit0[i] = bit0[i + 32];
+    ppu.tile_table[target_point_tile].bit1[i] = bit1[i + 32];
+  }
 
   ppu.tile_table[shell_tile].bit0 = {
       0b00000000,
@@ -127,45 +96,28 @@ PlayMode::PlayMode() {
       0b00000000,
   };
 
-  ppu.palette_table[wall_palette] = {
-      glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-      glm::u8vec4(0xa5, 0x2a, 0x2a, 0xff),
-      glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-      glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-  };
+  ppu.palette_table[player_palette] = palettes[0];
 
-  ppu.palette_table[spike_palette] = {
-      glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-      glm::u8vec4(0x80, 0x80, 0x80, 0xff),
-      glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-      glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-  };
+  ppu.palette_table[wall_palette] = palettes[1];
 
-  ppu.palette_table[cannon_palette] = {
-      glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-      glm::u8vec4(0x4b, 0x53, 0x20, 0xff),
-      glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-      glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-  };
+  ppu.palette_table[spike_palette] = palettes[2];
 
-  ppu.palette_table[target_point_palette] = {
-      glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-      glm::u8vec4(0x00, 0x00, 0xff, 0xff),
-      glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-      glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-  };
+  ppu.palette_table[cannon_active_palette] = palettes[3];
+  ppu.palette_table[cannon_inactive_palette] = palettes[3];
+  for (int i = 1; i < 4; ++i) {
+    if (palettes[3][i] == glm::u8vec4{0xff}) {
+      ppu.palette_table[cannon_active_palette][i] = glm::u8vec4{0xff, 0x00, 0x00, 0xff};
+      ppu.palette_table[cannon_inactive_palette][i] = glm::u8vec4{0x00, 0xff, 0x00, 0xff};
+      break;
+    }
+  }
 
-  ppu.palette_table[player_palette] = {
-      glm::u8vec4(0x00, 0x00, 0x00, 0x00),
-      glm::u8vec4(0xff, 0xff, 0x00, 0xff),
-      glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-      glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-  };
+  ppu.palette_table[target_point_palette] = palettes[4];
 
   ppu.palette_table[shell_bullet_palette] = {
       glm::u8vec4(0x00, 0x00, 0x00, 0x00),
       glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-      glm::u8vec4(0xff, 0x00, 0x00, 0xff),
+      glm::u8vec4(0xff, 0xff, 0xff, 0xff),
       glm::u8vec4(0x00, 0x00, 0x00, 0xff),
   };
 }
@@ -325,7 +277,7 @@ void PlayMode::update(float elapsed) {
         || tiles[tile_right + tile_bottom * Level::width] == std::uint8_t(Level::TileType::target_point)
         || tiles[tile_left + tile_up * Level::width] == std::uint8_t(Level::TileType::target_point)
         || tiles[tile_right + tile_up * Level::width] == std::uint8_t(Level::TileType::target_point))
-        && n_activated_cannons == curr_level->cannons().size()) {
+        && size_t(n_activated_cannons) == curr_level->cannons().size()) {
       level_id = (level_id + 1) % levels.size();
       load_level(level_id);
       return;
@@ -344,8 +296,8 @@ void PlayMode::update(float elapsed) {
       return;
     }
 
-    time_since_last_shoot += elapsed;
     // shoot bullet
+    time_since_last_shoot += elapsed;
     if (shoot.pressed && can_shoot && time_since_last_shoot >= shoot_interval) {
       can_shoot = false;
       time_since_last_shoot = 0.0f;
@@ -424,16 +376,16 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
     auto x = cannon.pos % Level::width;
     auto y = cannon.pos / Level::width;
     if (cannon.active) {
-      ppu.background[x + PPU466::BackgroundWidth * y] = cannon_active_tile | (cannon_palette << 8);
+      ppu.background[x + PPU466::BackgroundWidth * y] = cannon_tile | (cannon_active_palette << 8);
     } else {
-      ppu.background[x + PPU466::BackgroundWidth * y] = cannon_inactive_tile | (cannon_palette << 8);
+      ppu.background[x + PPU466::BackgroundWidth * y] = cannon_tile | (cannon_inactive_palette << 8);
     }
   }
 
   //sprites:
   ppu.sprites[0].x = int8_t(objects[0].pos.x);
   ppu.sprites[0].y = int8_t(objects[0].pos.y);
-  ppu.sprites[0].index = player_tile;
+  ppu.sprites[0].index = objects[0].direction == ObjectDirection::left ? player_left_tile : player_right_tile;
   ppu.sprites[0].attributes = player_palette;
 
   for (int i = 1; i < 64; ++i) {

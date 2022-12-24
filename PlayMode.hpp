@@ -17,7 +17,9 @@
 
 namespace {
 std::vector<Level> levels;
-std::vector<std::array<uint8_t, 2>> tile_table;
+std::vector<std::array<glm::u8vec4, 4>> palettes;
+std::vector<uint8_t> bit0;
+std::vector<uint8_t> bit1;
 
 [[maybe_unused]] Load<void> _load_helper
     (LoadTag::LoadTagDefault,
@@ -25,20 +27,40 @@ std::vector<std::array<uint8_t, 2>> tile_table;
        std::vector<uint8_t> data;
        std::ifstream ifs{data_path("game_data"), std::ios::binary};
        if (!ifs) {
-         process_assets();
+         if (!process_assets()) {
+           exit(1);
+         }
          ifs.open(data_path("game_data"), std::ios::binary);
        }
 
        // ------------ read levels ------------
        read_chunk<uint8_t>(ifs, "leve", &data);
        std::array<uint8_t, Level::n_tiles> tiles{};
-       auto itr = tiles.begin();
+       auto tiles_itr = tiles.begin();
        for (const auto tile : data) {
-         *itr = tile;
-         if (++itr == tiles.end()) {
+         *tiles_itr = tile;
+         if (++tiles_itr == tiles.end()) {
            levels.emplace_back(tiles);
-           itr = tiles.begin();
+           tiles_itr = tiles.begin();
          }
+       }
+
+       // ------------ read sprites ------------
+       read_chunk<uint8_t>(ifs, "pale", &data);
+       std::array<glm::u8vec4, 4> palette{};
+       auto palette_itr = palette.begin();
+       for (int i = 0; i < data.size(); i += 4) {
+         (*palette_itr) = {data[i], data[i + 1], data[i + 2], data[i + 3]};
+         if (++palette_itr == palette.end()) {
+           palettes.emplace_back(palette);
+           palette_itr = palette.begin();
+         }
+       }
+
+       read_chunk<uint8_t>(ifs, "tile", &data);
+       for (int i = 0; i < data.size(); i += 2) {
+         bit0.emplace_back(data[i]);
+         bit1.emplace_back(data[i + 1]);
        }
      }
     );
