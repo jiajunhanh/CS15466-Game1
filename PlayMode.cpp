@@ -13,17 +13,19 @@ namespace {
 constexpr auto empty_tile = 0;
 constexpr auto wall_tile = 1;
 constexpr auto spike_tile = 2;
-constexpr auto artillery_tile = 3;
+constexpr auto cannon_active_tile = 3;
+constexpr auto cannon_inactive_tile = 3;
 constexpr auto target_point_tile = 4;
 constexpr auto player_tile = 5;
 constexpr auto shell_tile = 6;
+constexpr auto bullet_tile = 7;
 
 constexpr auto wall_palette = 0;
 constexpr auto spike_palette = 1;
-constexpr auto artillery_palette = 2;
+constexpr auto cannon_palette = 2;
 constexpr auto target_point_palette = 3;
 constexpr auto player_palette = 4;
-constexpr auto shell_palette = 5;
+constexpr auto shell_bullet_palette = 5;
 }
 
 PlayMode::PlayMode() {
@@ -56,7 +58,7 @@ PlayMode::PlayMode() {
   };
   ppu.tile_table[spike_tile].bit1 = {};
 
-  ppu.tile_table[artillery_tile].bit0 = {
+  ppu.tile_table[cannon_active_tile].bit0 = {
       0b11111111,
       0b11111111,
       0b11111111,
@@ -66,7 +68,7 @@ PlayMode::PlayMode() {
       0b11111111,
       0b11111111,
   };
-  ppu.tile_table[artillery_tile].bit1 = {};
+  ppu.tile_table[cannon_active_tile].bit1 = {};
 
   ppu.tile_table[target_point_tile].bit0 = {
       0b11111111,
@@ -113,6 +115,18 @@ PlayMode::PlayMode() {
   };
   ppu.tile_table[shell_tile].bit1 = {};
 
+  ppu.tile_table[bullet_tile].bit0 = {};
+  ppu.tile_table[bullet_tile].bit1 = {
+      0b00000000,
+      0b00000000,
+      0b00000000,
+      0b00011000,
+      0b00011000,
+      0b00000000,
+      0b00000000,
+      0b00000000,
+  };
+
   ppu.palette_table[wall_palette] = {
       glm::u8vec4(0x00, 0x00, 0x00, 0x00),
       glm::u8vec4(0xa5, 0x2a, 0x2a, 0xff),
@@ -127,7 +141,7 @@ PlayMode::PlayMode() {
       glm::u8vec4(0x00, 0x00, 0x00, 0xff),
   };
 
-  ppu.palette_table[artillery_palette] = {
+  ppu.palette_table[cannon_palette] = {
       glm::u8vec4(0x00, 0x00, 0x00, 0x00),
       glm::u8vec4(0x4b, 0x53, 0x20, 0xff),
       glm::u8vec4(0x00, 0x00, 0x00, 0xff),
@@ -148,10 +162,10 @@ PlayMode::PlayMode() {
       glm::u8vec4(0x00, 0x00, 0x00, 0xff),
   };
 
-  ppu.palette_table[shell_palette] = {
+  ppu.palette_table[shell_bullet_palette] = {
       glm::u8vec4(0x00, 0x00, 0x00, 0x00),
       glm::u8vec4(0x00, 0x00, 0x00, 0xff),
-      glm::u8vec4(0x00, 0x00, 0x00, 0xff),
+      glm::u8vec4(0xff, 0x00, 0x00, 0xff),
       glm::u8vec4(0x00, 0x00, 0x00, 0xff),
   };
 }
@@ -178,6 +192,10 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
       down.downs += 1;
       down.pressed = true;
       return true;
+    } else if (evt.key.keysym.sym == SDLK_z) {
+      shoot.downs += 1;
+      shoot.pressed = true;
+      return true;
     }
   } else if (evt.type == SDL_KEYUP) {
     if (evt.key.keysym.sym == SDLK_LEFT) {
@@ -192,6 +210,10 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
     } else if (evt.key.keysym.sym == SDLK_DOWN) {
       down.pressed = false;
       return true;
+    } else if (evt.key.keysym.sym == SDLK_z) {
+      shoot.pressed = false;
+      can_shoot = true;
+      return true;
     }
   }
 
@@ -199,25 +221,24 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 }
 
 void PlayMode::update(float elapsed) {
-  constexpr auto max_velocity = glm::vec2(30.0f, 30.0f);
-  constexpr auto gravity = 100.0f;
-  constexpr auto launch_interval = 2.0f;
-  static auto time_since_last_launch = 0.0f;
-  static int next_object = 1;
 
   time_since_last_launch += elapsed;
   if (time_since_last_launch > launch_interval) {
+
+    // launch shells
     time_since_last_launch = 0.0f;
-    for (auto artillery_idx : levels[level_id].artillery()) {
-      auto x = artillery_idx % Level::width;
-      auto y = artillery_idx / Level::width;
+    for (const auto &cannon : curr_level->cannons()) {
+      if (!cannon.active) continue;
+      auto x = cannon.pos % Level::width;
+      auto y = cannon.pos / Level::width;
       auto pos_x = float(x) * 8.0f;
       auto pos_y = float(y) * 8.0f;
-      auto &object = objects[next_object];
+      objects[next_object] = Object{
+          ObjectType::shell,
+          glm::vec2(pos_x, pos_y),
+          glm::normalize(objects[0].pos - glm::vec2(pos_x, pos_y)) * glm::length(max_velocity)
+      };
       next_object = (next_object + 1) % 63 + 1;
-      object.pos = glm::vec2(pos_x, pos_y);
-      object.v = glm::normalize(objects[0].pos - object.pos) * glm::length(max_velocity);
-      object.type = ObjectType::shell;
     }
   }
 
@@ -226,8 +247,14 @@ void PlayMode::update(float elapsed) {
     auto &object = objects[0];
     // update player behavior
     object.v.x = 0.0f;
-    if (left.pressed) object.v.x = -max_velocity.x;
-    if (right.pressed) object.v.x = max_velocity.x;
+    if (left.pressed) {
+      object.v.x = -max_velocity.x;
+      object.direction = ObjectDirection::left;
+    }
+    if (right.pressed) {
+      object.v.x = max_velocity.x;
+      object.direction = ObjectDirection::right;
+    }
     if (up.pressed) object.v.y = max_velocity.y;
 
     // add gravity force
@@ -238,7 +265,7 @@ void PlayMode::update(float elapsed) {
     // ------------ update position ------------
 
     // horizontal movement
-    const auto &tiles = levels[level_id].tiles();
+    const auto &tiles = curr_level->tiles();
     auto ghost_pos = object.pos + object.v * elapsed;
     auto tile_left = int(std::floor(object.pos.x)) / 8;
     auto tile_right = (int(std::ceil(object.pos.x + 8.0f)) - 1) / 8;
@@ -289,19 +316,19 @@ void PlayMode::update(float elapsed) {
     }
     object.pos.y += object.v.y * elapsed;
 
-
     // check if player passed the level
     tile_left = int(std::floor(object.pos.x)) / 8;
     tile_right = (int(std::ceil(object.pos.x + 8.0f)) - 1) / 8;
     tile_bottom = int(std::floor(object.pos.y)) / 8;
     tile_up = (int(std::ceil(object.pos.y + 8.0f)) - 1) / 8;
-    if (tiles[tile_left + tile_bottom * Level::width] == std::uint8_t(Level::TileType::target_point)
+    if ((tiles[tile_left + tile_bottom * Level::width] == std::uint8_t(Level::TileType::target_point)
         || tiles[tile_right + tile_bottom * Level::width] == std::uint8_t(Level::TileType::target_point)
         || tiles[tile_left + tile_up * Level::width] == std::uint8_t(Level::TileType::target_point)
-        || tiles[tile_right + tile_up * Level::width] == std::uint8_t(Level::TileType::target_point)) {
+        || tiles[tile_right + tile_up * Level::width] == std::uint8_t(Level::TileType::target_point))
+        && n_activated_cannons == curr_level->cannons().size()) {
       level_id = (level_id + 1) % levels.size();
       load_level(level_id);
-      time_since_last_launch = 0.0f;
+      return;
     }
 
     // check if player touched spikes
@@ -309,23 +336,55 @@ void PlayMode::update(float elapsed) {
     tile_right = (int(std::ceil(object.pos.x + 8.0f)) - 1) / 8;
     tile_bottom = int(std::floor(object.pos.y)) / 8;
     tile_up = (int(std::ceil(object.pos.y + 8.0f)) - 1) / 8;
-    if (tiles[tile_left + tile_bottom * Level::width] == std::uint8_t(Level::TileType::spike)
+    if ((tiles[tile_left + tile_bottom * Level::width] == std::uint8_t(Level::TileType::spike)
         || tiles[tile_right + tile_bottom * Level::width] == std::uint8_t(Level::TileType::spike)
         || tiles[tile_left + tile_up * Level::width] == std::uint8_t(Level::TileType::spike)
-        || tiles[tile_right + tile_up * Level::width] == std::uint8_t(Level::TileType::spike)) {
+        || tiles[tile_right + tile_up * Level::width] == std::uint8_t(Level::TileType::spike))) {
       load_level(level_id);
-      time_since_last_launch = 0.0f;
+      return;
     }
-  }
+
+    time_since_last_shoot += elapsed;
+    // shoot bullet
+    if (shoot.pressed && can_shoot && time_since_last_shoot >= shoot_interval) {
+      can_shoot = false;
+      time_since_last_shoot = 0.0f;
+      objects[next_object] = Object{
+          ObjectType::bullet,
+          object.pos,
+          object.direction == ObjectDirection::right ? glm::vec2{max_velocity.x * 2.0f, 0.0f} : glm::vec2{
+              -max_velocity.x * 2.0f,
+              0.0f}
+      };
+      next_object = (next_object + 1) % 63 + 1;
+    }
+
+  } // finished processing player object
 
   // process for other objects
   for (int i = 1; i < 64; ++i) {
-    objects[i].pos += objects[i].v * elapsed;
-    // check if shell hits player
-    if (objects[i].pos.x >= 0.0f && objects[i].pos.x < 256 && objects[i].pos.y >= 0.0f && objects[i].pos.y < 240 &&
-        std::abs(objects[i].pos.x - objects[0].pos.x) < 5.0f && std::abs(objects[i].pos.y - objects[0].pos.y) < 5.0f) {
+    auto &object = objects[i];
+    object.pos += object.v * elapsed;
+    if (object.pos.x < 0.0f || object.pos.x >= 256
+        && object.pos.y < 0.0f && object.pos.y >= 240) {
+      continue;
+    } else if (object.type == ObjectType::shell // check if shell hits player
+        && std::abs(object.pos.x - objects[0].pos.x) < 5.0f
+        && std::abs(object.pos.y - objects[0].pos.y) < 5.0f) {
       load_level(level_id);
-      time_since_last_launch = 0.0f;
+      return;
+    } else if (object.type == ObjectType::bullet) { // check if bullet hits cannons
+      auto x = int(floor(object.pos.x / 8.0f + 0.5f));
+      auto y = int(floor(object.pos.y / 8.0f + 0.5f));
+      if (curr_level->tiles()[x + y * Level::width] == int(Level::TileType::cannon)) {
+        for (auto &cannon : curr_level->cannons()) {
+          if (cannon.pos == x + y * Level::width && !cannon.active) {
+            cannon.active = true;
+            ++n_activated_cannons;
+            break;
+          }
+        }
+      }
     }
   }
 
@@ -334,10 +393,11 @@ void PlayMode::update(float elapsed) {
   right.downs = 0;
   up.downs = 0;
   down.downs = 0;
+  shoot.downs = 0;
 }
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
-  const auto &tiles = levels[level_id].tiles();
+  const auto &tiles = curr_level->tiles();
 
   ppu.background_color = glm::u8vec4(0x87, 0xce, 0xeb, 0xff);
 
@@ -345,23 +405,32 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
     for (uint32_t x = 0; x < Level::width; ++x) {
       auto tile_type = Level::TileType(tiles[x + y * Level::width]);
       switch (tile_type) {
-        case Level::TileType::wall :ppu.background[x + PPU466::BackgroundWidth * y] = wall_tile | (wall_palette << 8);
+        case Level::TileType::wall :
+          ppu.background[x + PPU466::BackgroundWidth * y] = wall_tile | (wall_palette << 8);
           break;
         case Level::TileType::spike :
           ppu.background[x + PPU466::BackgroundWidth * y] = spike_tile | (spike_palette << 8);
           break;
-        case Level::TileType::artillery:
-          ppu.background[x + PPU466::BackgroundWidth * y] = artillery_tile | (artillery_palette << 8);
-          break;
         case Level::TileType::target_point :
           ppu.background[x + PPU466::BackgroundWidth * y] = target_point_tile | (target_point_palette << 8);
           break;
-        default:ppu.background[x + PPU466::BackgroundWidth * y] = empty_tile;
+        default:
+          ppu.background[x + PPU466::BackgroundWidth * y] = empty_tile;
       }
     }
   }
 
-  //sprite:
+  for (const auto &cannon : curr_level->cannons()) {
+    auto x = cannon.pos % Level::width;
+    auto y = cannon.pos / Level::width;
+    if (cannon.active) {
+      ppu.background[x + PPU466::BackgroundWidth * y] = cannon_active_tile | (cannon_palette << 8);
+    } else {
+      ppu.background[x + PPU466::BackgroundWidth * y] = cannon_inactive_tile | (cannon_palette << 8);
+    }
+  }
+
+  //sprites:
   ppu.sprites[0].x = int8_t(objects[0].pos.x);
   ppu.sprites[0].y = int8_t(objects[0].pos.y);
   ppu.sprites[0].index = player_tile;
@@ -371,8 +440,15 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
     if (objects[i].pos.x >= 0.0f && objects[i].pos.x < 256 && objects[i].pos.y >= 0.0f && objects[i].pos.y < 240) {
       ppu.sprites[i].x = int8_t(objects[i].pos.x);
       ppu.sprites[i].y = int8_t(objects[i].pos.y);
-      ppu.sprites[i].index = shell_tile;
-      ppu.sprites[i].attributes = shell_palette;
+      if (objects[i].type == ObjectType::shell) {
+        ppu.sprites[i].index = shell_tile;
+        ppu.sprites[i].attributes = shell_bullet_palette;
+      } else if (objects[i].type == ObjectType::bullet) {
+        ppu.sprites[i].index = bullet_tile;
+        ppu.sprites[i].attributes = shell_bullet_palette;
+      } else {
+        ppu.sprites[i].y = 240;
+      }
     } else {
       ppu.sprites[i].y = 240;
     }
@@ -384,8 +460,15 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 
 void PlayMode::load_level(size_t id) {
   level_id = id;
-  objects[0] = Object{levels[id].spawn_pos(), glm::vec2(0.0f), ObjectType::player};
+  curr_level = &levels[level_id];
+  curr_level->init();
+  objects[0] = Object{ObjectType::player, curr_level->spawn_pos(), glm::vec2{0.0f}, ObjectDirection::right};
   for (int i = 1; i < 64; ++i) {
-    objects[i] = Object{glm::vec2(0.0f, 250.0f), glm::vec2(0.0f), ObjectType::shell};
+    objects[i] = Object{ObjectType::bullet, glm::vec2{0.0f, 240.0f}, glm::vec2{0.0f}};
   }
+  time_since_last_launch = 0.0f;
+  time_since_last_shoot = shoot_interval;
+  can_shoot = true;
+  next_object = 1;
+  n_activated_cannons = 0;
 }

@@ -13,8 +13,6 @@
 //for screenshots:
 #include "load_save_png.hpp"
 
-#include "asset_pipeline.h"
-
 //Includes for libSDL:
 #include <SDL.h>
 
@@ -103,11 +101,6 @@ int main(int argc, char **argv) {
 
   //Hide mouse cursor (note: showing can be useful for debugging):
   //SDL_ShowCursor(SDL_DISABLE);
-
-  //------------ process assets --------------
-  if(!process_assets()) {
-    exit(1);
-  }
 
   //------------ load assets --------------
   call_load_functions();

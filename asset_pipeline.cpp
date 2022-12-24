@@ -21,7 +21,7 @@ bool process_assets() {
     std::cerr << e.what() << '\n';
   }
   if (pixels.empty() || size[0] != 32 || size[1] % 30) {
-    std::cerr << "Illegal levels.\n";
+    std::cerr << "Invalid levels.\n";
     return false;
   }
   std::vector<uint8_t> level_chunk;
@@ -33,7 +33,7 @@ bool process_assets() {
     } else if (pixel == spike_pattern) {
       level_chunk.push_back(std::uint8_t(Level::TileType::spike));
     } else if (pixel == artillery_pattern) {
-      level_chunk.push_back(std::uint8_t(Level::TileType::artillery));
+      level_chunk.push_back(std::uint8_t(Level::TileType::cannon));
     } else if (pixel == spawn_point_pattern) {
       level_chunk.push_back(std::uint8_t(Level::TileType::spawn_point));
     } else if (pixel == target_point_pattern) {

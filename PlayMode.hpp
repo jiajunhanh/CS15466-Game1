@@ -6,6 +6,7 @@
 #include "read_write_chunk.hpp"
 #include "data_path.hpp"
 #include "Level.h"
+#include "asset_pipeline.h"
 
 #include <glm/glm.hpp>
 
@@ -16,12 +17,17 @@
 
 namespace {
 std::vector<Level> levels;
+std::vector<std::array<uint8_t, 2>> tile_table;
 
 [[maybe_unused]] Load<void> _load_helper
     (LoadTag::LoadTagDefault,
      [&levels = levels]() {
        std::vector<uint8_t> data;
-       std::ifstream ifs(data_path("game_data"), std::ios::binary);
+       std::ifstream ifs{data_path("game_data"), std::ios::binary};
+       if (!ifs) {
+         process_assets();
+         ifs.open(data_path("game_data"), std::ios::binary);
+       }
 
        // ------------ read levels ------------
        read_chunk<uint8_t>(ifs, "leve", &data);
@@ -51,25 +57,43 @@ struct PlayMode : Mode {
   void load_level(size_t id);
   //----- game state -----
 
+  static constexpr auto max_velocity = glm::vec2(30.0f, 30.0f);
+  static constexpr float gravity = 100.0f;
+  static constexpr float launch_interval = 2.0f;
+  static constexpr float shoot_interval = 1.0f;
+  float time_since_last_launch{};
+  float time_since_last_shoot{};
+  bool can_shoot{};
+  int next_object{};
+  int n_activated_cannons{};
+
   // level index
   size_t level_id{};
+  Level *curr_level{};
 
   //input tracking:
   struct Button {
     uint8_t downs = 0;
     uint8_t pressed = 0;
-  } left, right, down, up;
+  } left, right, down, up, shoot;
 
   //object status:
   enum class ObjectType {
     player,
-    shell
+    shell,
+    bullet
+  };
+
+  enum class ObjectDirection {
+    left,
+    right
   };
 
   struct Object {
+    ObjectType type;
     glm::vec2 pos{};
     glm::vec2 v{};
-    ObjectType type{};
+    ObjectDirection direction{};
   };
 
   std::array<Object, 64> objects{};
