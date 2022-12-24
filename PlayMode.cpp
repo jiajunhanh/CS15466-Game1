@@ -365,8 +365,8 @@ void PlayMode::update(float elapsed) {
   for (int i = 1; i < 64; ++i) {
     auto &object = objects[i];
     object.pos += object.v * elapsed;
-    if (object.pos.x < 0.0f || object.pos.x >= 256
-        && object.pos.y < 0.0f && object.pos.y >= 240) {
+    if (object.pos.x < 0.0f || object.pos.x >= 256.0f
+        || object.pos.y < 0.0f || object.pos.y >= 240.0f) {
       continue;
     } else if (object.type == ObjectType::shell // check if shell hits player
         && std::abs(object.pos.x - objects[0].pos.x) < 5.0f
