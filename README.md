@@ -1,22 +1,13 @@
-# (TODO: your game's title)
-
-Author: (TODO: your name)
-
-Design: (TODO: In two sentences or fewer, describe what is new and interesting about your game.)
-
-Screen Shot:
-
-![Screen Shot](screenshot.png)
-
-How Your Asset Pipeline Works:
-
-(TODO: describe the steps in your asset pipeline, from source files to tiles/backgrounds/whatever you upload to the PPU466.)
-
-(TODO: make sure the source files you drew are included. You can [link](your/file.png) to them to be a bit fancier.)
+https://user-images.githubusercontent.com/51411668/221936890-94720919-43ab-4da8-b799-1508f98272bd.mp4
 
 How To Play:
 
-(TODO: describe the controls and (if needed) goals/strategy.)
+Press the arrow keys to move.
+Press 'z' to shoot a bullet.
+You need to first activate all the enemy cannons (the rectangles with green lights) by shooting them and then fly to the target point (the red flag).
+Once a cannon is activated, it will shoot bullets toward you. Try to dodge the bullets from enemies!
+There are also some spikes in the map, you need to dodge them too.
+If you are hit by enemies' bullets or touch a spike, the level will be reset.
 
 This game was built with [NEST](NEST.md).
 
